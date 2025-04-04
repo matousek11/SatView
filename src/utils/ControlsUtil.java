@@ -11,14 +11,15 @@ import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
 public class ControlsUtil {
-    private final Vector3f cameraPos = new Vector3f(-3.0f, 1.0f, 0.0f);
-    private final Vector3f cameraFront = new Vector3f(1.0f, -0.3f, 0.0f);
+    private final Vector3f cameraPos = new Vector3f(-3.0f, 0f, 0.0f);
+    private final Vector3f cameraFront = new Vector3f(1.0f, 0f, 0.0f);
     private final Vector3f cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
     private float cameraSpeed = 0.05f;
 
     private double lastX, lastY;
     private boolean firstMouse = true;
-    private float yaw = -90.0f;
+    // must be changed with change of cameraPos
+    private float yaw = 0.0f;
     private float pitch = 0.0f;
     private final float mouseSensitivity = 0.2f;
 
@@ -103,10 +104,10 @@ public class ControlsUtil {
             cameraFront.cross(cameraUp, right).normalize().mul(cameraSpeed);
             cameraPos.add(right);
         }
-        if (glfwGetKey(windowID, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        if (glfwGetKey(windowID, GLFW_KEY_E) == GLFW_PRESS) {
             cameraPos.add(new Vector3f(cameraUp).mul(cameraSpeed));  // Move up
         }
-        if (glfwGetKey(windowID, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+        if (glfwGetKey(windowID, GLFW_KEY_Q) == GLFW_PRESS) {
             cameraPos.sub(new Vector3f(cameraUp).mul(cameraSpeed));  // Move down
         }
         if (glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
