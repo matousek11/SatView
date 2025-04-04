@@ -8,6 +8,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="joml-1.10.7-sources" level="application" />
+    <orderEntry type="library" name="joml-1.10.7-sources" level="application" />
+    <orderEntry type="library" exported="" name="joml-1.10.7-sources1" level="application" />
   </component>
 </module>

@@ -11,8 +11,8 @@ import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
 public class ControlsUtil {
-    private final Vector3f cameraPos = new Vector3f(0.0f, 0.0f, 3.0f);
-    private final Vector3f cameraFront = new Vector3f(0.0f, 0.0f, -1.0f);
+    private final Vector3f cameraPos = new Vector3f(-3.0f, 1.0f, 0.0f);
+    private final Vector3f cameraFront = new Vector3f(1.0f, -0.3f, 0.0f);
     private final Vector3f cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
     private float cameraSpeed = 0.05f;
 
@@ -20,7 +20,7 @@ public class ControlsUtil {
     private boolean firstMouse = true;
     private float yaw = -90.0f;
     private float pitch = 0.0f;
-    private final float mouseSensitivity = 0.1f;
+    private final float mouseSensitivity = 0.2f;
 
     private final long windowID;
 

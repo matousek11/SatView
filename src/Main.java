@@ -14,13 +14,16 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import org.joml.Matrix4f;
-import shaders.FragmentShader;
-import shaders.VertexShader;
+import shaders.BaseFragmentShader;
+import shaders.BaseVertexShader;
+import shaders.EarthFragmentShader;
+import shaders.EarthVertexShader;
 import utils.ControlsUtil;
 
 public class Main {
     private long window;
     private ControlsUtil controlsUtil;
+    private double prevTime = 0, rotation = 0;
 
 
     public static void main(String[] args) {
@@ -51,7 +54,7 @@ public class Main {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         // Create a window
-        window = glfwCreateWindow(800, 600, "SatView", NULL, NULL);
+        window = glfwCreateWindow(1200, 900, "SatView", NULL, NULL);
         if (window == NULL) {
             throw new RuntimeException("Failed to create the GLFW window");
         }
@@ -86,112 +89,133 @@ public class Main {
     private void loop() {
         // Initialize OpenGL bindings
         GL.createCapabilities();
-
-        // Set clear color
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        // setup shaders
-        int shaderProgram = glCreateProgram();
-        VertexShader vertexShader = new VertexShader();
-        vertexShader.setup(shaderProgram);
-        FragmentShader fragmentShader = new FragmentShader();
-        fragmentShader.setup(shaderProgram);
-
-        glLinkProgram(shaderProgram);
-
-        vertexShader.deleteShader();
-        fragmentShader.deleteShader();
-
-        float[] vertices = {
-                // Position          // Color
-                0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f, // Red vertex
-                -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f, // Green vertex
-                0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f  // Blue vertex
+        float[] lineVertices = {
+                0f,  0.0f, 0.0f,  // First point
+                -5f,  0.0f, 0.0f   // Second point
         };
 
-        // Create VAO and VBO
-        int vao = glGenVertexArrays();
-        glBindVertexArray(vao);
-        int vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, vertices, GL_STATIC_DRAW);
+        int lineVao = glGenVertexArrays();
+        glBindVertexArray(lineVao);
 
-        // Set vertex attribute pointers
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 6 * Float.BYTES, 0); // Position
-        glVertexAttribPointer(1, 3, GL_FLOAT, false, 6 * Float.BYTES, 3 * Float.BYTES); // Color
+        int lineVbo = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
+        glBufferData(GL_ARRAY_BUFFER, lineVertices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
         glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
 
-        /*Sphere sphere = new Sphere(20, 20);*/
+        glBindBuffer(GL_ARRAY_BUFFER, lineVao);
+        glBindVertexArray(lineVao);
 
+
+        // setup shaders
+        int baseShaderID = glCreateProgram();
+        BaseVertexShader baseVertexShader = new BaseVertexShader();
+        baseVertexShader.setup(baseShaderID);
+        BaseFragmentShader baseFragmentShader = new BaseFragmentShader();
+        baseFragmentShader.setup(baseShaderID);
+
+        glLinkProgram(baseShaderID);
+
+        baseVertexShader.deleteShader();
+        baseFragmentShader.deleteShader();
+
+        int earthShaderID = glCreateProgram();
+        EarthVertexShader earthVertexShader = new EarthVertexShader();
+        earthVertexShader.setup(earthShaderID);
+        EarthFragmentShader earthFragmentShader = new EarthFragmentShader();
+        earthFragmentShader.setup(earthShaderID);
+
+        glLinkProgram(earthShaderID);
+
+        earthVertexShader.deleteShader();
+        earthFragmentShader.deleteShader();
+
+        Sphere sphere = new Sphere(40, 40);
+        int textureID = sphere.loadTexture();
 
         // Get uniform locations for transformations
-        int modelLoc = glGetUniformLocation(shaderProgram, "model");
-        int viewLoc = glGetUniformLocation(shaderProgram, "view");
-        int projLoc = glGetUniformLocation(shaderProgram, "projection");
+        int modelLocEarth = glGetUniformLocation(earthShaderID, "model");
+        int viewLocEarth = glGetUniformLocation(earthShaderID, "view");
+        int projLocEarth = glGetUniformLocation(earthShaderID, "projection");
 
-        float rotation = 0;
-        double prevTime = 0;
+        int modelLocBase = glGetUniformLocation(baseShaderID, "model");
+        int projLocBase = glGetUniformLocation(baseShaderID, "projection");
 
         // Rendering loop
         while (!glfwWindowShouldClose(window)) {
             controlsUtil.processInput();
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LESS);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                double crntTime = glfwGetTime();
-                if (crntTime - prevTime >= 1 / 60)
-                {
-                    rotation += 0.01f;
-                    prevTime = crntTime;
-                }
+            glUseProgram(earthShaderID);
 
-                // Set up transformations
-                Matrix4f model = new Matrix4f();
-                model.identity();
-                model.rotate(rotation, new Vector3f(0, 1, 0));
-                Matrix4f view = new Matrix4f();
-                view.identity();
-                view.translate(new Vector3f(0.0f, 0.0f, -2.0f)); // Camera position
-                Matrix4f projection = new Matrix4f();
-                projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
-
-                FloatBuffer modelBuffer = model.get(stack.mallocFloat(16));
-                FloatBuffer viewBuffer = view.get(stack.mallocFloat(16));
-                FloatBuffer projBuffer = projection.get(stack.mallocFloat(16));
-
-                glUniformMatrix4fv(modelLoc, false, modelBuffer);
-                glUniformMatrix4fv(viewLoc, false, viewBuffer);
-                glUniformMatrix4fv(projLoc, false, projBuffer);
-            }
-
-            glUseProgram(shaderProgram);
-            controlsUtil.updateViewMatrix(viewLoc);
-            glBindVertexArray(vao);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
-            /*Matrix4f sphereModel = new Matrix4f().translate(1.5f, 0.0f, 0.0f);
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                FloatBuffer modelBuffer = stack.mallocFloat(16);
-                sphereModel.get(modelBuffer);
-                glUniformMatrix4fv(modelLoc, false, modelBuffer);
-            }*/
-
-
-            /*sphere.render();*/
+            renderEarth(earthShaderID, modelLocEarth, viewLocEarth, projLocEarth, textureID, sphere);
+            //renderLine(modelLocBase, projLocBase, lineVao);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
-            /*sphere.cleanup();*/
         }
+    }
+
+    private void renderEarth(int shaderID, int modelLoc, int viewLoc, int projLoc, int textureID, Sphere sphere) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            double crntTime = glfwGetTime();
+            if (crntTime - prevTime >= 1 / 60)
+            {
+                rotation += 0.001f;
+                prevTime = crntTime;
+            }
+
+            // Set up transformations
+            Matrix4f model = new Matrix4f();
+            model.identity();
+            model.rotate((float) rotation, new Vector3f(0, 1, 0));
+            Matrix4f projection = new Matrix4f();
+            projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
+
+            FloatBuffer modelBuffer = model.get(stack.mallocFloat(16));
+            FloatBuffer projBuffer = projection.get(stack.mallocFloat(16));
+
+            glUniformMatrix4fv(modelLoc, false, modelBuffer);
+            glUniformMatrix4fv(projLoc, false, projBuffer);
+        }
+
+        glUniform1i(glGetUniformLocation(shaderID, "earthTexture"), 0);
+        glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        controlsUtil.updateViewMatrix(viewLoc);
+
+        sphere.render();
+    }
+
+    private void renderLine(int modelLoc, int projLoc, int lineVao) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            // Set up transformations
+            Matrix4f model = new Matrix4f();
+            model.identity();
+            Matrix4f projection = new Matrix4f();
+            projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
+
+            FloatBuffer modelBuffer = model.get(stack.mallocFloat(16));
+            FloatBuffer projBuffer = projection.get(stack.mallocFloat(16));
+
+            glUniformMatrix4fv(modelLoc, false, modelBuffer);
+            glUniformMatrix4fv(projLoc, false, projBuffer);
+        }
+
+        glBindVertexArray(lineVao);
+        glDrawArrays(GL_LINES, 0, 2);
+        glBindVertexArray(0);
     }
 
     /**
      * Cleanup resources after end of loop
      */
     private void cleanup() {
-        // Free resources
         /*glDeleteVertexArrays(vao);
         glDeleteBuffers(vbo);
         glDeleteProgram(shaderProgram);*/
