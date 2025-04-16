@@ -24,6 +24,7 @@ public class Main {
     private long window;
     private ControlsUtil controlsUtil;
     private double prevTime = 0, rotation = 0;
+    private int earthRadius = 6378; // in km
 
 
     public static void main(String[] args) {
@@ -91,23 +92,35 @@ public class Main {
         GL.createCapabilities();
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        float[] lineVertices = {
-                0f,  0.0f, 0.0f,  // First point
-                -5f,  0.0f, 0.0f   // Second point
+        float[] satellitePositions = {
+          20, 0, 500,
+          0, 49, 480,
+          0, 0, 125
         };
+
+        float size = 0.03f;
+        float[] quadVertices = {
+                // Triangle 1
+                0.0f,  size,  size,
+                0.0f,  size, -size,
+                0.0f, -size, -size,
+
+                // Triangle 2
+                0.0f,  size,  size,
+                0.0f, -size, -size,
+                0.0f, -size,  size
+        };
+
 
         int lineVao = glGenVertexArrays();
         glBindVertexArray(lineVao);
 
         int lineVbo = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
-        glBufferData(GL_ARRAY_BUFFER, lineVertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, quadVertices, GL_STATIC_DRAW);
 
         glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
         glEnableVertexAttribArray(0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, lineVao);
-        glBindVertexArray(lineVao);
 
 
         // setup shaders
@@ -153,8 +166,8 @@ public class Main {
 
             glUseProgram(earthShaderID);
 
+            renderSatellites(modelLocBase, projLocBase, lineVao, satellitePositions);
             renderEarth(earthShaderID, modelLocEarth, viewLocEarth, projLocEarth, textureID, sphere);
-            //renderLine(modelLocBase, projLocBase, lineVao);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -192,11 +205,32 @@ public class Main {
         sphere.render();
     }
 
-    private void renderLine(int modelLoc, int projLoc, int lineVao) {
+    private void renderSatellites(int modelLoc, int projLoc, int lineVao, float[] positions) {
+        for (int i = 0; i <= positions.length - 3; i += 3) {
+            float longitude = positions[i];
+            float latitude = positions[i + 1];
+            float height = positions[i + 2];
+            // longitude, latitude, height above earth
+            renderPlane(
+                    modelLoc,
+                    projLoc,
+                    lineVao,
+                    new Vector3f(((-1/(float)earthRadius) * (earthRadius + height)),0, 0),
+                    longitude,
+                    latitude
+            );
+        }
+    }
+
+    private void renderPlane(int modelLoc, int projLoc, int lineVao, Vector3f position, float longitude, float latitude) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            // Set up transformations
             Matrix4f model = new Matrix4f();
             model.identity();
+
+            model.rotate((float) Math.toRadians(longitude), 0,1,0);
+            model.rotate(-(float) Math.toRadians(latitude), 0,0,1);
+            model.translate(position);
+
             Matrix4f projection = new Matrix4f();
             projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
 
@@ -208,7 +242,7 @@ public class Main {
         }
 
         glBindVertexArray(lineVao);
-        glDrawArrays(GL_LINES, 0, 2);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
 
