@@ -81,17 +81,27 @@ public class DataProvider {
     }
 
     private float[] interpolatePosition(String[] satellitePosition, String[] nextSatellitePosition, float t) {
-        float longitude = Float.parseFloat(satellitePosition[0]) + (Float.parseFloat(nextSatellitePosition[0]) - Float.parseFloat(satellitePosition[0])) * t;
-        float latitude = Float.parseFloat(satellitePosition[1]) + (Float.parseFloat(nextSatellitePosition[1]) - Float.parseFloat(satellitePosition[1])) * t;
-        float height = Float.parseFloat(satellitePosition[2]) + (Float.parseFloat(nextSatellitePosition[2]) - Float.parseFloat(satellitePosition[2])) * t;
-        // geo calc error fix (when going from 180W long to 180E long)
-        if (
-                (Float.parseFloat(nextSatellitePosition[0]) * Float.parseFloat(satellitePosition[0])) < 0 &&
-                        Math.abs(Float.parseFloat(nextSatellitePosition[0])) > 160 &&
-                        Math.abs(Float.parseFloat(satellitePosition[0])) > 160
-        ) {
-            longitude = Float.parseFloat(nextSatellitePosition[0]);
+        float currentLongitude = Float.parseFloat(satellitePosition[0]);
+        float nextLongitude = Float.parseFloat(nextSatellitePosition[0]);
+        float currentLatitude = Float.parseFloat(satellitePosition[1]);
+        float nextLatitude = Float.parseFloat(nextSatellitePosition[1]);
+        float currentHeight = Float.parseFloat(satellitePosition[2]);
+        float nextHeight = Float.parseFloat(nextSatellitePosition[2]);
+
+        // Fix for longitude wraparound
+        if (Math.abs(nextLongitude - currentLongitude) > 180) {
+            if (currentLongitude > nextLongitude) {
+                nextLongitude += 360;
+            } else {
+                currentLongitude += 360;
+            }
         }
+
+        float longitude = currentLongitude + (nextLongitude - currentLongitude) * t;
+        longitude = ((longitude + 180) % 360 + 360) % 360 - 180; // Normalize to [-180, 180]
+
+        float latitude = currentLatitude + (nextLatitude - currentLatitude) * t;
+        float height = currentHeight + (nextHeight - currentHeight) * t;
 
         return new float[]{longitude, latitude, height};
     }
