@@ -11,24 +11,35 @@ import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
 public class ControlsUtil {
-    private final Vector3f cameraPos = new Vector3f(-3.0f, 0f, 0.0f);
-    private final Vector3f cameraFront = new Vector3f(1.0f, 0f, 0.0f);
+    private final Vector3f cameraPos = new Vector3f(-3.0f, 0.0f, 0.0f);
+    private final Vector3f cameraFront = new Vector3f(1.0f, 0.0f, 0.0f);
     private final Vector3f cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
     private float cameraSpeed = 0.05f;
+    private float cameraDistance = 3.0f;
+    private final float zoomSensitivity = 0.5f;
 
     private double lastX, lastY;
     private boolean firstMouse = true;
-    // must be changed with change of cameraPos
-    private float yaw = 0.0f;
+    private float yaw = 180f;   // Start looking at Europe
     private float pitch = 0.0f;
     private final float mouseSensitivity = 0.2f;
+    private double timespeed = 1;
 
     private final long windowID;
-
     private boolean leftMouseButtonPressed = false;
+    private boolean showInfobox = false;
 
     public ControlsUtil(long windowID) {
         this.windowID = windowID;
+        updateCameraPosition();
+        registerScrollCallback();
+    }
+
+    private void registerScrollCallback() {
+        glfwSetScrollCallback(windowID, (window, xoffset, yoffset) -> {
+            cameraDistance = Math.max(1.2f, cameraDistance - (float)yoffset * zoomSensitivity);
+            updateCameraPosition();
+        });
     }
 
     public void registerMouseMovementEventHandler() {
@@ -44,7 +55,7 @@ public class ControlsUtil {
             }
 
             double dx = xpos - lastX;
-            double dy = lastY - ypos; // Reversed since OpenGL y-coordinates go bottom to top
+            double dy = ypos - lastY;
 
             lastX = xpos;
             lastY = ypos;
@@ -59,16 +70,18 @@ public class ControlsUtil {
             if (pitch > 89.0f) pitch = 89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
 
-            updateCameraVectors();
+            updateCameraPosition();
         });
     }
 
-    private void updateCameraVectors() {
-        float x = (float) (Math.cos(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)));
-        float y = (float) Math.sin(Math.toRadians(pitch));
-        float z = (float) (Math.sin(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)));
+    private void updateCameraPosition() {
+        // Calculate new camera position based on spherical coordinates
+        float x = (float) (cameraDistance * Math.cos(Math.toRadians(pitch)) * Math.cos(Math.toRadians(yaw)));
+        float y = (float) (cameraDistance * Math.sin(Math.toRadians(pitch)));
+        float z = (float) (cameraDistance * Math.cos(Math.toRadians(pitch)) * Math.sin(Math.toRadians(yaw)));
 
-        cameraFront.set(x, y, z).normalize();
+        cameraPos.set(x, y, z);
+        cameraFront.set(-x, -y, -z).normalize();
     }
 
     /**
@@ -76,7 +89,7 @@ public class ControlsUtil {
      */
     public void updateViewMatrix(int viewLoc) {
         Matrix4f view = new Matrix4f();
-        view.lookAt(cameraPos, cameraPos.add(cameraFront, new Vector3f()), cameraUp);
+        view.lookAt(cameraPos, new Vector3f(0, 0, 0), cameraUp);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             FloatBuffer viewBuffer = view.get(stack.mallocFloat(16));
@@ -88,33 +101,44 @@ public class ControlsUtil {
      * Handle user control of app
      */
     public void processInput() {
-        if (glfwGetKey(windowID, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraPos.add(cameraFront.mul(cameraSpeed, new Vector3f()));
+        // Time speed control
+        if (glfwGetKey(windowID, GLFW_KEY_J) == GLFW_PRESS) {
+            timespeed -= 1;
+        } else if (glfwGetKey(windowID, GLFW_KEY_K) == GLFW_PRESS) {
+            timespeed += 1;
+        } else if (glfwGetKey(windowID, GLFW_KEY_P) == GLFW_PRESS) {
+            timespeed = 0;
+        } else if (glfwGetKey(windowID, GLFW_KEY_N) == GLFW_PRESS) {
+            timespeed = 1;
         }
-        if (glfwGetKey(windowID, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraPos.sub(cameraFront.mul(cameraSpeed, new Vector3f()));
+
+        // show infobox
+        if (glfwGetKey(windowID, GLFW_KEY_I) == GLFW_PRESS) {
+            showInfobox = !showInfobox;
         }
-        if (glfwGetKey(windowID, GLFW_KEY_A) == GLFW_PRESS) {
-            Vector3f left = new Vector3f();
-            cameraFront.cross(cameraUp, left).normalize().mul(cameraSpeed);
-            cameraPos.sub(left);
+
+        // keyboard zoom controls as alternative
+        if (glfwGetKey(windowID, GLFW_KEY_Z) == GLFW_PRESS) {
+            cameraDistance = Math.max(1.0f, cameraDistance - cameraSpeed);
+            updateCameraPosition();
+        } else if (glfwGetKey(windowID, GLFW_KEY_U) == GLFW_PRESS) {
+            cameraDistance += cameraSpeed;
+            updateCameraPosition();
         }
-        if (glfwGetKey(windowID, GLFW_KEY_D) == GLFW_PRESS) {
-            Vector3f right = new Vector3f();
-            cameraFront.cross(cameraUp, right).normalize().mul(cameraSpeed);
-            cameraPos.add(right);
-        }
-        if (glfwGetKey(windowID, GLFW_KEY_E) == GLFW_PRESS) {
-            cameraPos.add(new Vector3f(cameraUp).mul(cameraSpeed));  // Move up
-        }
-        if (glfwGetKey(windowID, GLFW_KEY_Q) == GLFW_PRESS) {
-            cameraPos.sub(new Vector3f(cameraUp).mul(cameraSpeed));  // Move down
-        }
+
         if (glfwGetMouseButton(windowID, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
             leftMouseButtonPressed = true;
         } else {
             firstMouse = true;
             leftMouseButtonPressed = false;
         }
+    }
+
+    public double getTimespeed() {
+        return timespeed;
+    }
+
+    public boolean getShowInfobox() {
+        return showInfobox;
     }
 }
