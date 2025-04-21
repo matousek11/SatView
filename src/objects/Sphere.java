@@ -13,6 +13,7 @@ import org.lwjgl.stb.STBImage;
 public class Sphere {
     private int vao, vbo, ebo;
     private int indexCount;
+    private float[] uniformColor = {1.0f, 1.0f, 1.0f};
 
     public Sphere(int stacks, int slices) {
         generateSphere(stacks, slices);
@@ -105,6 +106,12 @@ public class Sphere {
         glEnableVertexAttribArray(2);
 
         glBindVertexArray(0);
+    }
+
+    public void setColor(float r, float g, float b) {
+        uniformColor[0] = r;
+        uniformColor[1] = g;
+        uniformColor[2] = b;
     }
 
     public void render() {
