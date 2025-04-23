@@ -1,5 +1,7 @@
 import os
 from logging.config import fileConfig
+from pathlib import Path
+from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -7,9 +9,17 @@ from sqlalchemy import pool
 from alembic import context
 
 import sys
-import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import Base
+
+# Load environment variables from .env file
+# Look for .env in the project root (3 levels up from migrations/env.py)
+env_path = Path(__file__).parents[3] / '.env'
+load_dotenv(env_path)
+
+# Print the path and whether the file exists for debugging
+print(f"Looking for .env file at: {env_path}")
+print(f"File exists: {env_path.exists()}")
 
 # Alembic Config object, which provides
 # access to the values within the .ini file in use
@@ -23,9 +33,15 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def get_url():
-    url = os.getenv("DATABASE_URL")
+    # Try DATABASE_URL first, then fall back to DB_DSN
+    url = os.getenv("DATABASE_URL") or os.getenv("DB_DSN")
     if not url:
-        raise ValueError("DATABASE_URL environment variable is not set")
+        raise ValueError("Neither DATABASE_URL nor DB_DSN environment variable is set")
+    
+    # If using DB_DSN, replace timescaledb with localhost for local development
+    if "timescaledb" in url:
+        url = url.replace("timescaledb", "localhost")
+    
     return url
 
 def run_migrations_offline() -> None:

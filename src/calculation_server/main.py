@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from skyfield.api import utc
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models import Base, Satellite
+from models import Satellite
 from satellite_utils import calculate_positions, save_positions_to_db
 
 # Setup logging per module

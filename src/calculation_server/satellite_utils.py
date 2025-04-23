@@ -86,13 +86,11 @@ def save_positions_to_db(
                     time=timestamp,
                     latitude=latitude,
                     longitude=longitude,
-                    height=height,
-                    is_orbit=0
+                    height=height
                 )
                 position_objects.append(position)
 
             db.add_all(position_objects)
-
             db.commit()
             
         except Exception as e:

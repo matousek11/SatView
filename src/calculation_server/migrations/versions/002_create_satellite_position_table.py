@@ -24,7 +24,6 @@ def upgrade() -> None:
         sa.Column('latitude', sa.Float(), nullable=False),
         sa.Column('longitude', sa.Float(), nullable=False),
         sa.Column('height', sa.Float(), nullable=False),
-        sa.Column('is_orbit', sa.Boolean(), nullable=False),
         sa.PrimaryKeyConstraint('id', 'time'),
         sa.ForeignKeyConstraint(['satellite_id'], ['Satellite.id'], ondelete='CASCADE')
     )

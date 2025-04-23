@@ -26,7 +26,6 @@ class SatellitePosition(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     height = Column(Float, nullable=False)
-    is_orbit = Column(Double, nullable=False)
     
     # Relationship to satellite
     satellite = relationship("Satellite", back_populates="positions")
