@@ -156,6 +156,7 @@ def main():
     
     session = get_session()
     
+    is_first_load = True
     while True:
         for norad_id in all_satellite_ids:
             logger.info(f"Fetching data for satellite {norad_id}")
@@ -166,8 +167,9 @@ def main():
             time.sleep(1)
 
         logger.info("Starting position calculations...")
-        calculate_and_save_positions(session)
+        calculate_and_save_positions(session, is_first_load)
         logger.info("Completed position calculations")
+        is_first_load = False
 
         logger.info("Completed update cycle, waiting 12 hours...")
         time.sleep(12 * 60 * 60)

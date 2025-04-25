@@ -31,7 +31,6 @@ public class Renderer {
 
     private int baseShaderID;
     private int earthShaderID;
-    private int earthTextureID;
 
     public Renderer(int windowWidth, int windowHeight, int earthRadius, ControlsUtil controlsUtil,
                    DataProvider dataProvider, ArrayList<Integer> satelliteIDs) {
@@ -72,9 +71,6 @@ public class Renderer {
         glLinkProgram(earthShaderID);
         earthVertexShader.deleteShader();
         earthFragmentShader.deleteShader();
-
-        // Load earth texture
-        earthTextureID = earthSphere.loadTexture();
     }
 
     public void render(double satelliteTime, String timeString) {
@@ -160,8 +156,6 @@ public class Renderer {
         }
 
         glUniform1i(glGetUniformLocation(earthShaderID, "earthTexture"), 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, earthTextureID);
         controlsUtil.updateViewMatrix(glGetUniformLocation(earthShaderID, "view"));
 
         earthSphere.render();
@@ -185,7 +179,7 @@ public class Renderer {
 
         if (controlsUtil.getShowInfobox()) {
             SimpleTextRenderer infoText = new SimpleTextRenderer(windowWidth, windowHeight, 18);
-            infoText.setText("Vizualizace polohy satelitu | Lukas Matousek | PGRF2");
+            infoText.setText("Vizualizace polohy satelitu | Lukas Matousek | PGRF2 | 25.4.2025");
             infoText.drawText(10, windowHeight - 15);
             
             SimpleTextRenderer controlText = new SimpleTextRenderer(windowWidth, windowHeight, 18);

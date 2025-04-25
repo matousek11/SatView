@@ -2,9 +2,13 @@ package objects;
 
 import static org.lwjgl.opengl.GL30.*;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.system.MemoryUtil;
@@ -14,9 +18,16 @@ public class Sphere {
     private int vao, vbo, ebo;
     private int indexCount;
     private float[] uniformColor = {1.0f, 1.0f, 1.0f};
+    private int textureID;
 
     public Sphere(int stacks, int slices) {
         generateSphere(stacks, slices);
+        try {
+            this.textureID = loadTexture("res/earth.png");
+        } catch (IOException e) {
+            System.err.println("Failed to load sphere texture: " + e.getMessage());
+            this.textureID = -1;
+        }
     }
 
     private void generateSphere(int stacks, int slices) {
@@ -115,42 +126,89 @@ public class Sphere {
     }
 
     public void render() {
+        if (textureID != -1) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+        }
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
+        if (textureID != -1) {
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
     }
 
-    public int loadTexture() {
-        int textureID = glGenTextures();
-        glBindTexture(GL_TEXTURE_2D, textureID);
+    private static ByteBuffer ioResourceToByteBuffer(String resource) throws IOException {
+        InputStream source = Sphere.class.getClassLoader().getResourceAsStream(resource);
+        if (source == null) {
+            throw new IOException("Failed to find resource via ClassLoader: " + resource);
+        }
 
-        // Set texture parameters
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        try (ReadableByteChannel rbc = Channels.newChannel(source)) {
+            ByteBuffer buffer = BufferUtils.createByteBuffer(8192);
+
+            while (true) {
+                int bytes = rbc.read(buffer);
+                if (bytes == -1) break;
+                if (buffer.remaining() == 0) {
+                    ByteBuffer newBuffer = BufferUtils.createByteBuffer(buffer.capacity() * 2);
+                    buffer.flip();
+                    newBuffer.put(buffer);
+                    buffer = newBuffer;
+                }
+            }
+            buffer.flip();
+            return buffer.slice();
+        }
+    }
+
+    private int loadTexture(String resourcePath) throws IOException {
+        int texID = glGenTextures();
+        glBindTexture(GL_TEXTURE_2D, texID);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        // Load image using STB
         IntBuffer width = BufferUtils.createIntBuffer(1);
         IntBuffer height = BufferUtils.createIntBuffer(1);
         IntBuffer channels = BufferUtils.createIntBuffer(1);
 
-        ByteBuffer image = STBImage.stbi_load("res/earth.png", width, height, channels, 0);
+        ByteBuffer imageBuffer;
+        try {
+            imageBuffer = ioResourceToByteBuffer(resourcePath);
+        } catch (IOException e) {
+            System.err.println("Failed to load texture resource: " + resourcePath);
+            throw e;
+        }
+
+        ByteBuffer image = STBImage.stbi_load_from_memory(imageBuffer, width, height, channels, 0);
         if (image != null) {
-            int format = (channels.get(0) == 4) ? GL_RGBA : GL_RGB;
+            int format = GL_RGB;
+            if (channels.get(0) == 4) {
+                format = GL_RGBA;
+            } else if (channels.get(0) == 1) {
+                format = GL_RED;
+            }
+
             glTexImage2D(GL_TEXTURE_2D, 0, format, width.get(0), height.get(0), 0, format, GL_UNSIGNED_BYTE, image);
             glGenerateMipmap(GL_TEXTURE_2D);
             STBImage.stbi_image_free(image);
         } else {
-            System.err.println("Failed to load texture");
+            throw new IOException("Failed to load texture data using STBImage: " + STBImage.stbi_failure_reason());
         }
 
-        return textureID;
+        glBindTexture(GL_TEXTURE_2D, 0);
+        return texID;
     }
 
     public void cleanup() {
         glDeleteVertexArrays(vao);
         glDeleteBuffers(vbo);
         glDeleteBuffers(ebo);
+        if (textureID != -1) {
+            glDeleteTextures(textureID);
+        }
     }
 }

@@ -7,11 +7,11 @@ import shaders.TextVertexShader;
 import shaders.TextFragmentShader;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
@@ -40,7 +40,7 @@ public class SimpleTextRenderer {
 
         try {
             // 1) Load TTF into ByteBuffer
-            ByteBuffer ttf = ioResourceToByteBuffer("res/arial.ttf");
+            ByteBuffer ttf = ioResourceToByteBuffer("res/arial.TTF");
 
             // 2) Create and compile shaders
             shaderProgram = glCreateProgram();
@@ -159,11 +159,25 @@ public class SimpleTextRenderer {
     }
 
     private static ByteBuffer ioResourceToByteBuffer(String resource) throws IOException {
-        try (FileChannel fc = FileChannel.open(Paths.get(resource), StandardOpenOption.READ)) {
-            ByteBuffer bb = BufferUtils.createByteBuffer((int)fc.size() + 1);
-            while (fc.read(bb) != -1);
-            bb.flip();
-            return bb;
+        InputStream source = SimpleTextRenderer.class.getClassLoader().getResourceAsStream(resource);
+
+        try (ReadableByteChannel rbc = Channels.newChannel(source)) {
+            ByteBuffer buffer = BufferUtils.createByteBuffer(8192);
+
+            while (true) {
+                int bytes = rbc.read(buffer);
+                if (bytes == -1) {
+                    break;
+                }
+                if (buffer.remaining() == 0) {
+                    ByteBuffer newBuffer = BufferUtils.createByteBuffer(buffer.capacity() * 2);
+                    buffer.flip();
+                    newBuffer.put(buffer);
+                    buffer = newBuffer;
+                }
+            }
+            buffer.flip();
+            return buffer.slice();
         }
     }
 
