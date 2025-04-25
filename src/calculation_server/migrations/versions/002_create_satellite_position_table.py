@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column('longitude', sa.Float(), nullable=False),
         sa.Column('height', sa.Float(), nullable=False),
         sa.PrimaryKeyConstraint('id', 'time'),
-        sa.ForeignKeyConstraint(['satellite_id'], ['Satellite.id'], ondelete='CASCADE')
+        sa.ForeignKeyConstraint(['satellite_id'], ['Satellite.satellite_id'], ondelete='CASCADE')
     )
 
     op.create_index(

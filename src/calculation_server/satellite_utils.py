@@ -82,7 +82,7 @@ def save_positions_to_db(
             for timestamp, latitude, longitude, height in batch:
                 position = SatellitePosition(
                     id=int(satellite.id),
-                    satellite_id=int(satellite.id),
+                    satellite_id=int(satellite.satellite_id),
                     time=timestamp,
                     latitude=latitude,
                     longitude=longitude,

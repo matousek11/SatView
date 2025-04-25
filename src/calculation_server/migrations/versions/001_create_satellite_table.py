@@ -19,7 +19,7 @@ def upgrade() -> None:
     op.create_table(
         'Satellite',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('satellite_id', sa.String(), nullable=False),
+        sa.Column('satellite_id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(), nullable=False),
         sa.Column('tle', sa.String(), nullable=False),
         sa.PrimaryKeyConstraint('id'),
