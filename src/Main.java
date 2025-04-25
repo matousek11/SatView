@@ -1,31 +1,35 @@
-import objects.Sphere;
-import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
+import utils.ControlsUtil;
+import utils.DataProvider;
 
-import java.nio.FloatBuffer;
+import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 
 import static java.sql.Types.NULL;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
-import org.joml.Matrix4f;
-import shaders.BaseFragmentShader;
-import shaders.BaseVertexShader;
-import shaders.EarthFragmentShader;
-import shaders.EarthVertexShader;
-import utils.ControlsUtil;
 
 public class Main {
     private long window;
     private ControlsUtil controlsUtil;
-    private double prevTime = 0, rotation = 0;
-    private int earthRadius = 6378; // in km
+    private final int earthRadius = 6378; // in km
+    private DataProvider dataProvider;
+    private ArrayList<Integer> satelliteIDs;
+    private double satelliteTime;
+    double previousSecond;
+    private Renderer renderer;
 
+    private int windowWidth = 1450;
+    private int windowHeight = 900;
+    private double mousePressStartTime = 0;
+    private static final double CLICK_THRESHOLD = 0.2; // seconds
 
     public static void main(String[] args) {
         new Main().run();
@@ -41,7 +45,6 @@ public class Main {
     }
 
     private void init() {
-        // Initialize GLFW
         if (!glfwInit()) {
             throw new IllegalStateException("Unable to initialize GLFW");
         }
@@ -55,7 +58,7 @@ public class Main {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         // Create a window
-        window = glfwCreateWindow(1200, 900, "SatView", NULL, NULL);
+        window = glfwCreateWindow(windowWidth, windowHeight, "SatView", NULL, NULL);
         if (window == NULL) {
             throw new RuntimeException("Failed to create the GLFW window");
         }
@@ -80,179 +83,69 @@ public class Main {
 
         // Make OpenGL context current
         glfwMakeContextCurrent(window);
+        GL.createCapabilities();
         glfwSwapInterval(1); // Enable V-Sync
         glfwShowWindow(window);
+
+        satelliteIDs = new ArrayList<>();
+        Collections.addAll(satelliteIDs, 62483, 62484, 62485, 62486, 62487, 62488, 62489, 62490, 62491, 62492, 62493, 62494, 62495, 62496, 62497, 62498, 62499, 62500, 62501, 62502, 62503, 62504, 62505, 62506, 62507, 62508, 62509, 62510, 62511, 62512, 62513, 62514, 62515, 62516, 62517, 62518, 62519, 62520, 62521, 62522, 62523, 62524, 62525, 62526, 62527, 62528, 62529, 62530, 62531, 62532, 62533, 62534, 62535, 62536, 62537, 62538, 62539, 62540, 62541, 62542, 62543, 62544, 62545, 62546, 62547, 62548, 62549, 62550, 62551, 62552, 62553, 62554, 62555, 62556, 62557, 62558, 62559, 62560, 62561, 62562, 62563, 62564, 62565, 62566, 62567, 62568, 62569, 62570, 62571, 62572, 62573, 62574, 62575, 62576, 62577, 62578, 62579, 62580, 62581, 62582, 62583, 62584, 62585, 62586, 62587, 62588, 62589, 62590, 62591, 62592, 62593, 62594, 62595, 62596, 62597, 62598, 62599, 62600, 62601, 62602, 62603, 62604, 62605, 62606, 62607, 62609, 62610, 62611, 62612, 62613, 62614, 62615, 62616, 62617, 62618, 62619, 62620, 62621, 62622, 62623, 62624, 62625, 62626, 62627, 62628, 62629, 62630, 62631, 62632, 62633, 62634, 62635, 62636, 62637, 62638, 62639, 62640, 62641, 62642, 62643, 62644, 62645, 62646, 62647, 62648, 62649, 62650, 62651, 62652, 62653, 62654, 62655, 62656, 62657, 62658, 62659, 62660, 62661, 62662, 62663, 62664, 62665, 62666, 62667, 62668, 62669, 62670, 62671, 62672, 62673, 62674, 62675, 62676, 62677, 62678, 62679, 62680, 62681, 62682, 62683, 62684, 62685, 62686, 62687, 62688, 62689, 62690, 62691, 62692, 62693, 62694, 62695, 62696, 62697, 62698, 62699, 62700, 62701, 62702, 62703, 62704, 62705, 62706, 62707, 62708, 62709, 62710, 62711, 62712, 62713, 62714, 62715, 62716, 62717, 62718, 62719, 62720, 62725, 62726, 62727, 62728, 62729, 62730, 62731, 62732, 62733, 62735, 62736, 62737, 62738, 62739, 62740, 62741, 62742, 62743, 62744, 62745, 62746, 62747, 62748, 62749, 62750, 62751, 62752, 62753, 62754, 62755, 62756, 62757, 62758, 62759, 62760, 62761, 62762, 62763, 62764, 62765, 62766, 62767, 62768, 62769, 62770, 62771, 62772, 62773, 62774, 62775, 62776, 62777, 62778, 62779, 62780, 62781, 62782, 62783, 62784, 62785, 62786, 62787, 62788, 62789, 62790, 62791, 62792, 62793, 62794, 62795, 62796, 62797, 62798, 62799, 62800, 62801, 62802, 62803, 62804, 62805, 62806, 62807, 62808, 62809, 62810, 62811, 62812, 62813, 62814, 62815, 62816, 62817, 62818, 62819, 62820, 62821, 62822, 62823, 62824, 62825, 62826, 62827, 62828, 62829, 62830, 62831, 62832, 62833, 62834, 62835, 62836, 62837, 62838, 62839, 62840, 62841, 62842, 62843, 62844, 62845, 62846, 62847, 62848, 62849, 62850, 62851, 62852, 62853, 63002, 63003, 63004, 63153, 63488);
+        dataProvider = (new DataProvider(satelliteIDs));
+
+        satelliteTime = (double) System.currentTimeMillis() / 1000 - 6 * 60 * 60;
+        previousSecond = glfwGetTime();
+
+        // Initialize renderer
+        renderer = new Renderer(windowWidth, windowHeight, earthRadius, controlsUtil, dataProvider, satelliteIDs);
     }
 
-    /**
-     * Run loop in which whole app renders
-     */
     private void loop() {
-        // Initialize OpenGL bindings
-        GL.createCapabilities();
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-        float[] satellitePositions = {
-          20, 0, 500,
-          0, 49, 480,
-          0, 0, 125
-        };
-
-        float size = 0.03f;
-        float[] quadVertices = {
-                // Triangle 1
-                0.0f,  size,  size,
-                0.0f,  size, -size,
-                0.0f, -size, -size,
-
-                // Triangle 2
-                0.0f,  size,  size,
-                0.0f, -size, -size,
-                0.0f, -size,  size
-        };
-
-
-        int lineVao = glGenVertexArrays();
-        glBindVertexArray(lineVao);
-
-        int lineVbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, lineVbo);
-        glBufferData(GL_ARRAY_BUFFER, quadVertices, GL_STATIC_DRAW);
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
-        glEnableVertexAttribArray(0);
-
-
-        // setup shaders
-        int baseShaderID = glCreateProgram();
-        BaseVertexShader baseVertexShader = new BaseVertexShader();
-        baseVertexShader.setup(baseShaderID);
-        BaseFragmentShader baseFragmentShader = new BaseFragmentShader();
-        baseFragmentShader.setup(baseShaderID);
-
-        glLinkProgram(baseShaderID);
-
-        baseVertexShader.deleteShader();
-        baseFragmentShader.deleteShader();
-
-        int earthShaderID = glCreateProgram();
-        EarthVertexShader earthVertexShader = new EarthVertexShader();
-        earthVertexShader.setup(earthShaderID);
-        EarthFragmentShader earthFragmentShader = new EarthFragmentShader();
-        earthFragmentShader.setup(earthShaderID);
-
-        glLinkProgram(earthShaderID);
-
-        earthVertexShader.deleteShader();
-        earthFragmentShader.deleteShader();
-
-        Sphere sphere = new Sphere(40, 40);
-        int textureID = sphere.loadTexture();
-
-        // Get uniform locations for transformations
-        int modelLocEarth = glGetUniformLocation(earthShaderID, "model");
-        int viewLocEarth = glGetUniformLocation(earthShaderID, "view");
-        int projLocEarth = glGetUniformLocation(earthShaderID, "projection");
-
-        int modelLocBase = glGetUniformLocation(baseShaderID, "model");
-        int projLocBase = glGetUniformLocation(baseShaderID, "projection");
+        // mouse button callback for satellite picking
+        glfwSetMouseButtonCallback(window, (window, button, action, _) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                if (action == GLFW_PRESS) {
+                    mousePressStartTime = glfwGetTime();
+                } else if (action == GLFW_RELEASE) {
+                    double pressDuration = glfwGetTime() - mousePressStartTime;
+                    if (pressDuration < CLICK_THRESHOLD) {
+                        try (MemoryStack stack = MemoryStack.stackPush()) {
+                            DoubleBuffer xpos = stack.mallocDouble(1);
+                            DoubleBuffer ypos = stack.mallocDouble(1);
+                            glfwGetCursorPos(window, xpos, ypos);
+                            renderer.getSatellitePicker().pickSatellite(xpos.get(0), ypos.get(0), controlsUtil, satelliteTime);
+                        }
+                    }
+                }
+            }
+        });
 
         // Rendering loop
         while (!glfwWindowShouldClose(window)) {
             controlsUtil.processInput();
-            glEnable(GL_DEPTH_TEST);
-            glDepthFunc(GL_LESS);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            
+            // Update satellite time
+            if (glfwGetTime() - previousSecond > 0.02) {
+                satelliteTime = (satelliteTime + (glfwGetTime() - previousSecond) * controlsUtil.getTimespeed());
+                previousSecond = glfwGetTime();
+            }
 
-            glUseProgram(earthShaderID);
+            String timeString = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+                    .withZone(ZoneOffset.UTC)
+                    .format(Instant.ofEpochSecond((long) satelliteTime)) + " - " + controlsUtil.getTimespeed() + "X";
 
-            renderSatellites(modelLocBase, projLocBase, lineVao, satellitePositions);
-            renderEarth(earthShaderID, modelLocEarth, viewLocEarth, projLocEarth, textureID, sphere);
+            // Render everything
+            renderer.render(satelliteTime, timeString);
 
+            // Swap buffers and poll events
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
-    }
-
-    private void renderEarth(int shaderID, int modelLoc, int viewLoc, int projLoc, int textureID, Sphere sphere) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            double crntTime = glfwGetTime();
-            if (crntTime - prevTime >= 1 / 60)
-            {
-                rotation += 0.001f;
-                prevTime = crntTime;
-            }
-
-            // Set up transformations
-            Matrix4f model = new Matrix4f();
-            model.identity();
-            model.rotate((float) rotation, new Vector3f(0, 1, 0));
-            Matrix4f projection = new Matrix4f();
-            projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
-
-            FloatBuffer modelBuffer = model.get(stack.mallocFloat(16));
-            FloatBuffer projBuffer = projection.get(stack.mallocFloat(16));
-
-            glUniformMatrix4fv(modelLoc, false, modelBuffer);
-            glUniformMatrix4fv(projLoc, false, projBuffer);
-        }
-
-        glUniform1i(glGetUniformLocation(shaderID, "earthTexture"), 0);
-        glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        controlsUtil.updateViewMatrix(viewLoc);
-
-        sphere.render();
-    }
-
-    private void renderSatellites(int modelLoc, int projLoc, int lineVao, float[] positions) {
-        for (int i = 0; i <= positions.length - 3; i += 3) {
-            float longitude = positions[i];
-            float latitude = positions[i + 1];
-            float height = positions[i + 2];
-            // longitude, latitude, height above earth
-            renderPlane(
-                    modelLoc,
-                    projLoc,
-                    lineVao,
-                    new Vector3f(((-1/(float)earthRadius) * (earthRadius + height)),0, 0),
-                    longitude,
-                    latitude
-            );
-        }
-    }
-
-    private void renderPlane(int modelLoc, int projLoc, int lineVao, Vector3f position, float longitude, float latitude) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            Matrix4f model = new Matrix4f();
-            model.identity();
-
-            model.rotate((float) Math.toRadians(longitude), 0,1,0);
-            model.rotate(-(float) Math.toRadians(latitude), 0,0,1);
-            model.translate(position);
-
-            Matrix4f projection = new Matrix4f();
-            projection.setPerspective((float) Math.toRadians(45.0), 800.0f / 600.0f, 0.1f, 100.0f);
-
-            FloatBuffer modelBuffer = model.get(stack.mallocFloat(16));
-            FloatBuffer projBuffer = projection.get(stack.mallocFloat(16));
-
-            glUniformMatrix4fv(modelLoc, false, modelBuffer);
-            glUniformMatrix4fv(projLoc, false, projBuffer);
-        }
-
-        glBindVertexArray(lineVao);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
     }
 
     /**
      * Cleanup resources after end of loop
      */
     private void cleanup() {
-        /*glDeleteVertexArrays(vao);
-        glDeleteBuffers(vbo);
-        glDeleteProgram(shaderProgram);*/
+        renderer.cleanup();
         glfwDestroyWindow(window);
         glfwTerminate();
     }

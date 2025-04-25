@@ -1,12 +1,17 @@
 package utils;
 
 import java.sql.*;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 public class DataProvider {
+    private final String SEPARATOR = ";";
     private ArrayList<Integer> satelliteIDs;
+    private Map<Integer, String> satelliteNames;
 
     /**
      * Key is satelliteID from DB and value is longitude;latitude;height
@@ -15,15 +20,40 @@ public class DataProvider {
 
     public DataProvider(ArrayList<Integer> satelliteIDs) {
         this.satellitePositions = new HashMap<>();
+        this.satelliteNames = new HashMap<>();
         this.satelliteIDs = satelliteIDs;
-        satelliteIDs.forEach(satelliteID -> loadFromDb(satelliteID, (int)(System.currentTimeMillis() / 1000)));
+        satelliteIDs.forEach(satelliteID -> {
+            loadPositionsFromDb(satelliteID, (int)(System.currentTimeMillis() / 1000));
+        });
     }
 
-    public void loadFromDb(int satelliteID, int timestamp) {
-        String url = "jdbc:postgresql://localhost:5432/satview";
-        String user = "postgres";
-        String password = "postgres";
+    /**
+     * Fetches all satellites from the database and returns a map of satellite IDs to their names
+     *
+     * @return HashMap where key is satellite ID and value is satellite name
+     */
+    public Map<Integer, String> getSatelliteNames() {
+        String query = "SELECT id, satellite_id, name FROM \"Satellite\"";
 
+        if (!satelliteNames.isEmpty()) {
+            return satelliteNames;
+        }
+
+        try {
+            ResultSet rs = DatabaseConnection.executeQuery(query);
+            while (rs.next()) {
+                int satelliteID = rs.getInt("satellite_id");
+                String name = rs.getString("name");
+                satelliteNames.put(satelliteID, name + SEPARATOR + satelliteID);
+            }
+        } catch (SQLException e) {
+            System.out.println("Error fetching satellite names: " + e.getMessage());
+        }
+
+        return satelliteNames;
+    }
+
+    private void loadPositionsFromDb(int satelliteID, int timestamp) {
         String query = """
             SELECT *
             FROM "SatellitePosition"
@@ -32,28 +62,30 @@ public class DataProvider {
         """;
 
         try {
-            Class.forName("org.postgresql.Driver");
+            String startTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneOffset.UTC)
+                    .format(Instant.ofEpochSecond((long) timestamp - 5 * 60 * 60));
+            String endTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneOffset.UTC)
+                    .format(Instant.ofEpochSecond((long) timestamp + 5 * 60 * 60));
 
-            Connection connection = DriverManager.getConnection(url, user, password);
-
-            PreparedStatement statement = connection.prepareStatement(query);
-            statement.setTimestamp(1, Timestamp.valueOf("2025-04-21 10:00:00"));
-            statement.setTimestamp(2, Timestamp.valueOf("2025-04-22 23:00:00"));
-            statement.setInt(3, satelliteID);
-
-            ResultSet rs = statement.executeQuery();
+            ResultSet rs = DatabaseConnection.executeQuery(query, 
+                Timestamp.valueOf(startTime),
+                Timestamp.valueOf(endTime),
+                satelliteID
+            );
 
             while (rs.next()) {
-                int id = rs.getInt("id");
                 int positionTimestamp = (int) (rs.getTimestamp("time").getTime() / 1000);
                 double latitude = rs.getDouble("latitude");
                 double longitude = rs.getDouble("longitude");
                 double height = rs.getDouble("height");
 
-                satellitePositions.put(id + String.valueOf(positionTimestamp), longitude + ";" + latitude + ";" + height);
+                satellitePositions.put(satelliteID + String.valueOf(positionTimestamp),
+                    longitude + SEPARATOR + latitude + SEPARATOR + height);
             }
-        } catch (ClassNotFoundException | SQLException e) {
-            System.out.println("error: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error loading positions from DB: " + e.getMessage());
         }
     }
 
@@ -73,8 +105,8 @@ public class DataProvider {
             return new float[0];
         }
 
-        String[] satellitePosition = data.split(";");
-        String[] nextSatellitePosition = nextData.split(";");
+        String[] satellitePosition = data.split(SEPARATOR);
+        String[] nextSatellitePosition = nextData.split(SEPARATOR);
         float t = (float) (timestamp - closestMinuteTimestamp) / 60;
 
         return interpolatePosition(satellitePosition, nextSatellitePosition, t);

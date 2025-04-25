@@ -5,12 +5,16 @@ import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 
 public class ControlsUtil {
+    private static final double TOGGLE_DEBOUNCE_TIME = 0.3; // seconds
+
     private final Vector3f cameraPos = new Vector3f(-3.0f, 0.0f, 0.0f);
     private final Vector3f cameraFront = new Vector3f(1.0f, 0.0f, 0.0f);
     private final Vector3f cameraUp = new Vector3f(0.0f, 1.0f, 0.0f);
@@ -24,15 +28,27 @@ public class ControlsUtil {
     private float pitch = 0.0f;
     private final float mouseSensitivity = 0.2f;
     private double timespeed = 1;
+    private double lastInfoboxToggleTime = 0;
 
     private final long windowID;
     private boolean leftMouseButtonPressed = false;
-    private boolean showInfobox = false;
+    private boolean showInfobox = true;
 
     public ControlsUtil(long windowID) {
         this.windowID = windowID;
         updateCameraPosition();
         registerScrollCallback();
+        showInfoboxAtStart();
+    }
+
+    private void showInfoboxAtStart() {
+        Timer hideInfoboxTimer = new Timer();
+        hideInfoboxTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                showInfobox = false;
+            }
+        }, 5000);
     }
 
     private void registerScrollCallback() {
@@ -104,17 +120,27 @@ public class ControlsUtil {
         // Time speed control
         if (glfwGetKey(windowID, GLFW_KEY_J) == GLFW_PRESS) {
             timespeed -= 1;
+            if (timespeed < -1000) {
+                timespeed = -1000;
+            }
         } else if (glfwGetKey(windowID, GLFW_KEY_K) == GLFW_PRESS) {
             timespeed += 1;
+            if (timespeed > 1000) {
+                timespeed = 1000;
+            }
         } else if (glfwGetKey(windowID, GLFW_KEY_P) == GLFW_PRESS) {
             timespeed = 0;
         } else if (glfwGetKey(windowID, GLFW_KEY_N) == GLFW_PRESS) {
             timespeed = 1;
         }
 
-        // show infobox
+        // show infobox with debounce
         if (glfwGetKey(windowID, GLFW_KEY_I) == GLFW_PRESS) {
-            showInfobox = !showInfobox;
+            double currentTime = glfwGetTime();
+            if (currentTime - lastInfoboxToggleTime > TOGGLE_DEBOUNCE_TIME) {
+                showInfobox = !showInfobox;
+                lastInfoboxToggleTime = currentTime;
+            }
         }
 
         // keyboard zoom controls as alternative
