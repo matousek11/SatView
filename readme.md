@@ -1,3 +1,5 @@
+![](screenshot.png)
+
 # Running with JAR file
 1. Download source
 2. Download JAR [SatView.jar](SatView.jar)
